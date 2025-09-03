@@ -1,15 +1,17 @@
-import mysql from 'mysql2/promise';
+import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-const pool = mysql.createPool({
-    host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'user_db',
-    waitForConnections: true,
-    connectionLimit: 10
-});
+const connectDB = async () => {
+    try {
+        const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/user_db';
+        const conn = await mongoose.connect(mongoUri);
+        console.log(`MongoDB Connected: ${conn.connection.host}`);
+    } catch (error) {
+        console.error('MongoDB connection error:', error);
+        process.exit(1);
+    }
+};
 
-export default pool;
+export default connectDB;

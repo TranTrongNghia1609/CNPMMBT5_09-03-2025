@@ -1,21 +1,28 @@
 import { useState } from 'react';
-import { AuthContext } from './auth.context';
+import { useAuth } from './auth.context';
 
-export const AuthWrapper = ({ children }) => {
-    const [auth, setAuth] = useState({
-        isAuthenticated: false,
-        user: {
-            email: "",
-            name: ""
-        }
-    });
-    const [appLoading, setAppLoading] = useState(true);
+const AuthWrapper = ({ children }) => {
+    const { loading, isAuthenticated } = useAuth();
 
-    return (
-        <AuthContext.Provider value={{
-            auth, setAuth, appLoading, setAppLoading
-        }}>
-            {children}
-        </AuthContext.Provider>
-    );
+    if (loading) {
+        return (
+            <div className="loading-wrapper">
+                <div className="loading-spinner">Loading...</div>
+            </div>
+        );
+    }
+
+    if (!isAuthenticated) {
+        return (
+            <div className="auth-required">
+                <h3>Authentication Required</h3>
+                <p>Please login to access this page.</p>
+                <a href="/login">Go to Login</a>
+            </div>
+        );
+    }
+
+    return children;
 };
+
+export default AuthWrapper;

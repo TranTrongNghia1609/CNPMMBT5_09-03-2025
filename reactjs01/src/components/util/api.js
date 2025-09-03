@@ -1,35 +1,57 @@
 import axios from './axios.customize';
-const createUserApi = (name, email, password) => {
-    const URL_API = "/v1/api/register";
-    const data = {
-        name, email, password
-    }
-    return axios.post(URL_API, data)
-}
-const loginApi = (email, password) => {
-    const URL_API = "/v1/api/login";
-    const data = {
-        email, password
-    }
-    return axios.post(URL_API, data)
-}
-const getUserApi = () => {
-    const URL_API = "/v1/api/user";
-    return axios.get(URL_API)
-}
-export const callFetchUsers = (page = 1, limit = 5) => {
-    let url = '/v1/api/users';
-    const params = new URLSearchParams();
+
+// Auth APIs
+export const registerAPI = (userData) => {
+    return axios.post('/auth/register', userData);
+};
+
+export const loginAPI = (credentials) => {
+    return axios.post('/auth/login', credentials);
+};
+
+export const logoutAPI = () => {
+    return axios.post('/auth/logout');
+};
+
+export const getProfileAPI = () => {
+    return axios.get('/auth/profile');
+};
+
+export const changePasswordAPI = (passwordData) => {
+    return axios.put('/auth/change-password', passwordData);
+};
+
+export const refreshTokenAPI = (refreshToken) => {
+    return axios.post('/auth/refresh-token', { refreshToken });
+};
+
+// User Management APIs
+export const getAllUsersAPI = (params = {}) => {
+    const { page, limit } = params;
+    let url = '/users';
     
-    if (page) params.append('page', page);
-    if (limit) params.append('limit', limit);
-    
-    if (params.toString()) {
-        url += `?${params.toString()}`;
+    if (page || limit) {
+        const queryParams = new URLSearchParams();
+        if (page) queryParams.append('page', page);
+        if (limit) queryParams.append('limit', limit);
+        url += `?${queryParams.toString()}`;
     }
     
     return axios.get(url);
 };
-export {
-    createUserApi, loginApi, getUserApi,
-}
+
+export const getUserByIdAPI = (id) => {
+    return axios.get(`/users/${id}`);
+};
+
+export const createUserAPI = (userData) => {
+    return axios.post('/users', userData);
+};
+
+export const updateUserAPI = (id, userData) => {
+    return axios.put(`/users/${id}`, userData);
+};
+
+export const deleteUserAPI = (id) => {
+    return axios.delete(`/users/${id}`);
+};
