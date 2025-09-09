@@ -28,4 +28,10 @@ router.get('/users/:id', optionalAuth, userController.getUserById);    // Công 
 router.put('/users/:id', authenticateToken, requireOwnerOrAdmin, userController.updateUser); // Chỉ owner
 router.delete('/users/:id', authenticateToken, requireOwnerOrAdmin, userController.deleteUser); // Chỉ owner
 
+// Search và filter routes
+router.get('/search', userController.searchUsers.bind(userController));
+router.get('/advanced-search', userController.advancedSearch.bind(userController));
+router.get('/suggestions', userController.getUserSuggestions.bind(userController));
+router.get('/filter/:filterType', userController.filterUsers.bind(userController));
+
 export default router;

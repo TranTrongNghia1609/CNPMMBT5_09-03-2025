@@ -206,4 +206,141 @@ export class UserModel {
             return false;
         }
     }
+    async searchUsers(
+        filters: any = {},
+        sortOptions: any = { createdAt: -1 },
+        skip: number = 0,
+        limit: number = 10
+    ): Promise<{ users: User[]; total: number }> {
+        try {
+            const [users, total] = await Promise.all([
+                UserSchema
+                    .find(filters)
+                    .select('-password -refreshToken')
+                    .sort(sortOptions)
+                    .skip(skip)
+                    .limit(limit),
+                UserSchema.countDocuments(filters)
+            ]);
+
+            return {
+                users: users.map(user => this.documentToUser(user)),
+                total
+            };
+        } catch (error) {
+            console.error('Search users error:', error);
+            throw error;
+        }
+    }
+
+    // Advanced search with custom query and field selection
+    async advancedSearch(
+        query: any = {},
+        selectFields: string = '',
+        populateFields: string = '',
+        skip: number = 0,
+        limit: number = 10
+    ): Promise<{ users: User[]; total: number }> {
+        try {
+            let projection = '-password -refreshToken'; // Default exclude password
+
+            // Parse select fields
+            if (selectFields) {
+                projection = selectFields.split(',').join(' ');
+                // Always exclude password for security
+                if (!projection.includes('-password')) {
+                    projection += ' -password -refreshToken';
+                }
+            }
+
+            const [users, total] = await Promise.all([
+                UserSchema
+                    .find(query)
+                    .select(projection)
+                    .skip(skip)
+                    .limit(limit),
+                UserSchema.countDocuments(query)
+            ]);
+
+            return {
+                users: users.map(user => this.documentToUser(user)),
+                total
+            };
+        } catch (error) {
+            console.error('Advanced search error:', error);
+            throw error;
+        }
+    }
+    async getSuggestions(field: string, query: string, limit: number = 5): Promise<string[]> {
+        try {
+            const searchRegex = { $regex: query, $options: 'i' };
+            const filter = { [field]: searchRegex };
+
+            const suggestions = await UserSchema
+                .find(filter)
+                .select(`${field} -_id`)
+                .limit(limit)
+                .lean();
+
+            // Extract unique values
+            const uniqueValues = [...new Set(
+                suggestions.map(item => item[field as keyof UserDocument])
+                    .filter(value => value) // Remove null/undefined
+            )];
+
+            return uniqueValues as string[];
+        } catch (error) {
+            console.error('Get suggestions error:', error);
+            throw error;
+        }
+    }
+    // Count users by different criteria
+    async getUserStats(): Promise<{
+        totalUsers: number;
+        activeUsers: number;
+        inactiveUsers: number;
+        recentUsers: number;
+    }> {
+        try {
+            const oneWeekAgo = new Date();
+            oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+            const [totalUsers, activeUsers, inactiveUsers, recentUsers] = await Promise.all([
+                UserSchema.countDocuments({}),
+                UserSchema.countDocuments({ isActive: true }),
+                UserSchema.countDocuments({ isActive: false }),
+                UserSchema.countDocuments({ createdAt: { $gte: oneWeekAgo } })
+            ]);
+
+            return {
+                totalUsers,
+                activeUsers,
+                inactiveUsers,
+                recentUsers
+            };
+        } catch (error) {
+            console.error('Get user stats error:', error);
+            throw error;
+        }
+    }
+
+    // Search users by text (full-text search)
+    async searchByText(searchText: string, limit: number = 10): Promise<User[]> {
+        try {
+            const users = await UserSchema
+                .find({
+                    $or: [
+                        { username: { $regex: searchText, $options: 'i' } },
+                        { email: { $regex: searchText, $options: 'i' } }
+                    ]
+                })
+                .select('-password -refreshToken')
+                .limit(limit);
+
+            return users.map(user => this.documentToUser(user));
+        } catch (error) {
+            console.error('Search by text error:', error);
+            throw error;
+        }
+    }
 }
