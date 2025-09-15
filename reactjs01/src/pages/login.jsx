@@ -23,22 +23,26 @@ const LoginPage = () => {
     };
 
     const handleSubmit = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-        setError('');
-
-        try {
-            const response = await loginAPI(formData);
-            if (response.data.user && response.data.accessToken) {
-                login(response.data.user, response.data.accessToken, response.data.refreshToken);
-                navigate('/users');
-            }
-        } catch (error) {
-            setError(error.response?.data?.message || 'Login failed');
-        } finally {
-            setLoading(false);
+    e.preventDefault();
+    if (loading) return;
+    setLoading(true);
+    setError('');
+    
+    try {
+        // Sử dụng hàm login từ context, truyền formData
+        const result = await login(formData);
+        if (result.success) {
+            navigate('/users');
+        } else {
+            setError(result.message);
         }
-    };
+    } catch (error) {
+        setError('Login failed');
+    } finally {
+        setLoading(false);
+    }
+
+};
 
     return (
         <div className="fixed inset-0 w-screen h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4 overflow-auto">
