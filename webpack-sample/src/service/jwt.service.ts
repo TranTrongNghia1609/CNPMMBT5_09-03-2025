@@ -38,7 +38,8 @@ export class JWTService {
                 return {
                     userId: decoded.userId,
                     email: decoded.email,
-                    username: decoded.username
+                    username: decoded.username,
+                    role: decoded.role || 'user'
                 } as TokenPayload;
             }
             
@@ -57,7 +58,8 @@ export class JWTService {
                 return {
                     userId: decoded.userId,
                     email: decoded.email,
-                    username: decoded.username
+                    username: decoded.username,
+                    role: decoded.role || 'user'
                 } as TokenPayload;
             }
             

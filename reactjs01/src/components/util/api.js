@@ -27,17 +27,11 @@ export const refreshTokenAPI = (refreshToken) => {
 
 // User Management APIs
 export const getAllUsersAPI = (params = {}) => {
-    const { page, limit } = params;
-    let url = '/users';
-    
-    if (page || limit) {
-        const queryParams = new URLSearchParams();
-        if (page) queryParams.append('page', page);
-        if (limit) queryParams.append('limit', limit);
-        url += `?${queryParams.toString()}`;
-    }
-    
-    return axios.get(url);
+    const { page = 1, limit = 10 } = params;
+    const queryParams = new URLSearchParams();
+    queryParams.append('page', page);
+    queryParams.append('limit', limit);
+    return axios.get(`/public/users?${queryParams.toString()}`);
 };
 
 export const getUserByIdAPI = (id) => {
@@ -54,6 +48,32 @@ export const updateUserAPI = (id, userData) => {
 
 export const deleteUserAPI = (id) => {
     return axios.delete(`/users/${id}`);
+};
+
+// Admin APIs
+export const updateUserByAdminAPI = (id, userData) => {
+    // Sử dụng route thông thường nhưng với quyền admin
+    return axios.put(`/users/${id}`, userData);
+};
+
+export const toggleUserStatusAPI = (id, isActive) => {
+    return axios.put(`/users/${id}/status`, { isActive });
+};
+
+export const changeUserRoleAPI = (id, role) => {
+    return axios.put(`/users/${id}/role`, { role });
+};
+
+export const getAdminUsersAPI = (params = {}) => {
+    const { page, limit, role, isActive } = params;
+    const queryParams = new URLSearchParams();
+    
+    if (page) queryParams.append('page', page);
+    if (limit) queryParams.append('limit', limit);
+    if (role) queryParams.append('role', role);
+    if (isActive !== undefined) queryParams.append('isActive', isActive);
+    
+    return axios.get(`/users?${queryParams.toString()}`);
 };
 // Search & Filter APIs (từ user.routes.ts)
 export const searchUsersAPI = (searchParams = {}) => {

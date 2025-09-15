@@ -6,7 +6,7 @@ const userModel = new UserModel();
 export class AuthController {
     async register(req: Request, res: Response) {
         try {
-            const { username, email, password } = req.body;
+            const { username, email, password, role } = req.body;
 
             // Validate input
             if (!username || !email || !password) {
@@ -29,6 +29,10 @@ export class AuthController {
                 });
             }
 
+            // Kiểm tra role hợp lệ
+            const validRoles = ['user', 'admin'];
+            const userRole = validRoles.includes(role) ? role : 'user';
+
             // Kiểm tra email đã tồn tại
             const existingUser = await userModel.findByEmail(email);
             if (existingUser) {
@@ -36,7 +40,13 @@ export class AuthController {
             }
 
             // Tạo user mới
-            const user = await userModel.create({ username, email, password });
+            const user = await userModel.create({ 
+                username, 
+                email, 
+                password, 
+                role: userRole,
+                isActive: true
+            });
             
             res.status(201).json({ 
                 message: 'User created successfully',
@@ -44,6 +54,8 @@ export class AuthController {
                     _id: user._id,
                     username: user.username,
                     email: user.email,
+                    role: user.role,
+                    isActive: user.isActive,
                     createdAt: user.createdAt
                 }
             });
@@ -148,6 +160,8 @@ export class AuthController {
                     _id: user._id,
                     username: user.username,
                     email: user.email,
+                    role: user.role,
+                    isActive: user.isActive,
                     createdAt: user.createdAt,
                     updatedAt: user.updatedAt
                 }

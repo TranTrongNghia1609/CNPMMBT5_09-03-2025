@@ -1,5 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { getAllUsersAPI, deleteUserAPI, createUserAPI, updateUserAPI, searchUsersAPI, getUserSuggestionsAPI, filterUsersAPI } from '../components/util/api';
+import { 
+    getAllUsersAPI, 
+    deleteUserAPI, 
+    createUserAPI, 
+    updateUserAPI, 
+    updateUserByAdminAPI,
+    searchUsersAPI, 
+    getUserSuggestionsAPI, 
+    filterUsersAPI,
+    toggleUserStatusAPI,
+    changeUserRoleAPI
+} from '../components/util/api';
 import { useAuth } from '../components/context/auth.context';
 
 // Import components
@@ -49,6 +60,8 @@ const UserPage = () => {
         _id: u._id || u.id || u.userId || '',
         username: u.username || u.userName || u.name || 'Unknown',
         email: u.email || u.mail || '',
+        role: u.role || 'user',
+        isActive: u.isActive !== false,
         createdAt: u.createdAt || u.created_at || u.dateCreated || new Date().toISOString()
     });
     // Fetch users function
@@ -63,9 +76,16 @@ const UserPage = () => {
                     page: pagination.page,
                     limit: pagination.limit
                 });
-            } else if (hasSearchParams()) {
-                // Sử dụng search API
+            } else if (searchParams.search) {
+                // Global search - sử dụng search API đơn giản
                 response = await searchUsersAPI({
+                    query: searchParams.search,
+                    page: pagination.page,
+                    limit: pagination.limit
+                });
+            } else if (searchParams.username || searchParams.email || searchParams.createdFrom || searchParams.createdTo) {
+                // Advanced search - sử dụng advanced search API
+                response = await advancedSearchUsersAPI({
                     ...searchParams,
                     page: pagination.page,
                     limit: pagination.limit
@@ -78,8 +98,19 @@ const UserPage = () => {
                 });
             }
 
-            const userData = response.data.users || [];
-            const normalizedUsers = userData.map(normalizeUser);
+            // Xử lý nhiều format response khác nhau
+            let userData = [];
+            if (response.data.users) {
+                userData = response.data.users;
+            } else if (response.data.data) {
+                userData = response.data.data;
+            } else if (Array.isArray(response.data)) {
+                userData = response.data;
+            } else {
+                userData = [];
+            }
+            
+            const normalizedUsers = Array.isArray(userData) ? userData.map(normalizeUser) : [];
             
             setUsers(normalizedUsers);
             setPagination(prev => ({
@@ -96,10 +127,12 @@ const UserPage = () => {
     };
 
     // useEffect hooks
-   useEffect(() => {
-        fetchUsers();
+    useEffect(() => {
+        if (isAuthenticated) {
+            fetchUsers();
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [pagination.page, pagination.limit, activeFilter]);
+    }, [pagination.page, pagination.limit, activeFilter, isAuthenticated]);
 
     // Debounce search để tránh gọi API quá nhiều
     useEffect(() => {
@@ -120,11 +153,22 @@ const UserPage = () => {
     };
 
     const canEditUser = (user) => {
+        // Admin có thể edit tất cả user
+        if (isAuthenticated && currentUser && currentUser.role === 'admin') {
+            return true;
+        }
+        // User thường chỉ có thể edit chính mình
         return isAuthenticated && currentUser && currentUser._id === user._id;
     };
 
     // Search handlers
     const handleSearchChange = (field, value) => {
+        if (field === 'triggerSearch') {
+            // Kích hoạt tìm kiếm thủ công
+            fetchUsers();
+            return;
+        }
+        
         setSearchParams(prev => ({
             ...prev,
             [field]: value
@@ -148,9 +192,24 @@ const UserPage = () => {
 
         try {
             const response = await getUserSuggestionsAPI(field, query, 5);
-            setSuggestions(response.data.data || []);
+            console.log("Raw suggestion response:", response.data);
+            
+            // Kiểm tra nhiều cấu trúc dữ liệu có thể
+            let suggestionsData = [];
+            if (response.data) {
+                if (Array.isArray(response.data)) {
+                    suggestionsData = response.data;
+                } else if (response.data.data && Array.isArray(response.data.data)) {
+                    suggestionsData = response.data.data;
+                } else if (response.data.suggestions && Array.isArray(response.data.suggestions)) {
+                    suggestionsData = response.data.suggestions;
+                }
+            }
+            
+            console.log("Processed suggestions:", suggestionsData);
+            setSuggestions(suggestionsData);
             setSuggestionField(field);
-            setShowSuggestions(true);
+            setShowSuggestions(suggestionsData.length > 0);
         } catch (error) {
             console.error('Error fetching suggestions:', error);
             setSuggestions([]);
@@ -158,13 +217,16 @@ const UserPage = () => {
         }
     };
 
-    const handleSuggestionSelect = (suggestion) => {
+    const handleSuggestionSelect = (field, suggestion) => {
         setSearchParams(prev => ({
             ...prev,
-            [suggestionField]: suggestion
+            [field]: suggestion
         }));
         setShowSuggestions(false);
         setSuggestions([]);
+        setSuggestionField('');
+        // Gọi fetchUsers để cập nhật kết quả
+        fetchUsers();
     };
 
     // Filter handlers
@@ -199,21 +261,51 @@ const UserPage = () => {
     // CRUD handlers
     const handleCreate = () => {
         setEditingUser(null);
-        setFormData({
-            username: '',
-            email: '',
-            password: ''
-        });
+        
+        // Nếu là admin, cho phép tạo với đầy đủ thông tin
+        if (currentUser?.role === 'admin') {
+            setFormData({
+                username: '',
+                email: '',
+                password: '',
+                role: 'user',
+                isActive: true,
+                phone: ''
+            });
+        } else {
+            // User thường chỉ có thể tạo với thông tin cơ bản
+            setFormData({
+                username: '',
+                email: '',
+                password: ''
+            });
+        }
+        
         setShowModal(true);
     };
 
     const handleEdit = (user) => {
         setEditingUser(user);
-        setFormData({
-            username: user.username,
-            email: user.email,
-            password: ''
-        });
+        
+        // Nếu là admin, cho phép chỉnh sửa tất cả thông tin
+        if (currentUser?.role === 'admin') {
+            setFormData({
+                username: user.username,
+                email: user.email,
+                role: user.role || 'user',
+                isActive: user.isActive !== false,
+                phone: user.phone || '',
+                password: '' // Không hiển thị password cũ
+            });
+        } else {
+            // User thường chỉ có thể chỉnh sửa thông tin cơ bản
+            setFormData({
+                username: user.username,
+                email: user.email,
+                password: ''
+            });
+        }
+        
         setShowModal(true);
     };
 
@@ -232,12 +324,19 @@ const UserPage = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        
         try {
             if (editingUser) {
-                await updateUserAPI(editingUser._id, {
-                    username: formData.username,
-                    email: formData.email
-                });
+                if (currentUser?.role === 'admin') {
+                    // Nếu là admin, sử dụng API cập nhật đầy đủ
+                    await updateUserByAdminAPI(editingUser._id, formData);
+                } else {
+                    // Nếu là user thường, chỉ cập nhật thông tin cơ bản
+                    await updateUserAPI(editingUser._id, {
+                        username: formData.username,
+                        email: formData.email
+                    });
+                }
             } else {
                 await createUserAPI(formData);
             }
@@ -245,7 +344,37 @@ const UserPage = () => {
             setShowModal(false);
             fetchUsers();
         } catch (error) {
+            console.error('Submit error:', error);
             setError(error.response?.data?.message || 'Operation failed');
+        }
+    };
+
+    // Admin Functions
+    const handleToggleUserStatus = async (userId, newStatus) => {
+        if (!isAuthenticated || currentUser?.role !== 'admin') {
+            setError('You do not have permission to perform this action');
+            return;
+        }
+
+        try {
+            await toggleUserStatusAPI(userId, newStatus);
+            fetchUsers();
+        } catch (error) {
+            console.error('Toggle status error:', error);
+            setError(error.response?.data?.message || 'Failed to update user status');
+        }
+    };
+
+    const handleChangeUserRole = async (userId, newRole) => {
+        if (!window.confirm(`Are you sure you want to change this user's role to ${newRole}?`)) {
+            return;
+        }
+
+        try {
+            await changeUserRoleAPI(userId, newRole);
+            fetchUsers();
+        } catch (error) {
+            setError(error.response?.data?.message || 'Failed to change user role');
         }
     };
 
@@ -346,6 +475,8 @@ const UserPage = () => {
                             canEditUser={canEditUser}
                             onEdit={handleEdit}
                             onDelete={handleDelete}
+                            onToggleStatus={handleToggleUserStatus}
+                            onChangeRole={handleChangeUserRole}
                         />
 
                         <Pagination

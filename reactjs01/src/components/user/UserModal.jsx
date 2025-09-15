@@ -1,6 +1,10 @@
 import React from 'react';
+import { useAuth } from '../context/auth.context';
 
 const UserModal = ({ showModal, editingUser, formData, setFormData, onSubmit, onClose }) => {
+    const { user: currentUser } = useAuth();
+    const isAdmin = currentUser?.role === 'admin';
+    
     if (!showModal) return null;
 
     return (
@@ -41,6 +45,63 @@ const UserModal = ({ showModal, editingUser, formData, setFormData, onSubmit, on
                                 value={formData.password}
                                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                                 required
+                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                            />
+                        </div>
+                    )}
+
+                    {/* Role Selection - For Admin */}
+                    {isAdmin && (
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">Role:</label>
+                            <select
+                                value={formData.role || 'user'}
+                                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                            >
+                                <option value="user">👤 User</option>
+                                <option value="admin">👑 Admin</option>
+                            </select>
+                        </div>
+                    )}
+
+                    {/* User Status - For Admin */}
+                    {isAdmin && (
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">Status:</label>
+                            <div className="flex items-center space-x-4">
+                                <label className="flex items-center">
+                                    <input
+                                        type="radio"
+                                        name="status"
+                                        checked={formData.isActive === true}
+                                        onChange={() => setFormData({ ...formData, isActive: true })}
+                                        className="mr-2"
+                                    />
+                                    <span className="text-sm text-gray-700">Active</span>
+                                </label>
+                                <label className="flex items-center">
+                                    <input
+                                        type="radio"
+                                        name="status"
+                                        checked={formData.isActive === false}
+                                        onChange={() => setFormData({ ...formData, isActive: false })}
+                                        className="mr-2"
+                                    />
+                                    <span className="text-sm text-gray-700">Inactive</span>
+                                </label>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Additional Information */}
+                    {isAdmin && (
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">Phone:</label>
+                            <input
+                                type="tel"
+                                value={formData.phone || ''}
+                                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                             />
                         </div>

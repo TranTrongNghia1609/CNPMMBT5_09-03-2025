@@ -26,6 +26,15 @@ const UserSchema: Schema<UserDocument> = new Schema({
         required: true,
         minlength: 6
     },
+    role: {
+        type: String,
+        enum: ['user', 'admin'],
+        default: 'user'
+    },
+    isActive: {
+        type: Boolean,
+        default: true
+    },
     refreshToken: {
         type: String,
         default: null

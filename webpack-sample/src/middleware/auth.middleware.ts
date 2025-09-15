@@ -81,11 +81,29 @@ export const requireOwnerOrAdmin = (req: Request, res: Response, next: NextFunct
 
     const targetUserId = req.params.id;
     const currentUserId = req.user.userId;
+    const userRole = req.user.role;
 
-    // Cho phép user sửa/xóa chính mình hoặc admin (có thể mở rộng logic admin sau)
-    if (currentUserId !== targetUserId) {
+    // Cho phép admin hoặc user sửa/xóa chính mình
+    if (userRole === 'admin' || currentUserId === targetUserId) {
+        return next();
+    }
+
+    return res.status(403).json({ 
+        message: 'Access denied. You can only modify your own account or need admin privileges.' 
+    });
+};
+
+// Middleware kiểm tra quyền admin
+export const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user) {
+        return res.status(401).json({ 
+            message: 'Authentication required' 
+        });
+    }
+
+    if (req.user.role !== 'admin') {
         return res.status(403).json({ 
-            message: 'Access denied. You can only modify your own account.' 
+            message: 'Admin access required' 
         });
     }
 

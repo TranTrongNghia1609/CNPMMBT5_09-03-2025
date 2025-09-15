@@ -46,69 +46,41 @@ export class UserController {
     // Tìm kiếm và lọc users
     async searchUsers(req: Request, res: Response) {
         try {
-            const {
-                search,           // Tìm kiếm chung trong username, email
-                username,         // Lọc theo username
-                email,           // Lọc theo email
-                createdFrom,     // Lọc từ ngày tạo
-                createdTo,       // Lọc đến ngày tạo
-                sortBy = 'createdAt',        // Sắp xếp theo field nào
-                sortOrder = 'desc',          // asc hoặc desc
-                page = '1',
-                limit = '10'
+            const { 
+                q = '', 
+                page = 1, 
+                limit = 10, 
+                sortBy = 'createdAt', 
+                sortOrder = 'desc' 
             } = req.query;
 
-            // Build filter object
-            const filters: any = {};
-            
-            // Search chung trong multiple fields
-            if (search) {
-                filters.$or = [
-                    { username: { $regex: search, $options: 'i' } },
-                    { email: { $regex: search, $options: 'i' } }
-                ];
-            }
-
-            // Lọc theo username cụ thể
-            if (username) {
-                filters.username = { $regex: username, $options: 'i' };
-            }
-
-            // Lọc theo email cụ thể
-            if (email) {
-                filters.email = { $regex: email, $options: 'i' };
-            }
-
-            // Lọc theo khoảng thời gian tạo
-            if (createdFrom || createdTo) {
-                filters.createdAt = {};
-                if (createdFrom) {
-                    filters.createdAt.$gte = new Date(createdFrom as string);
-                }
-                if (createdTo) {
-                    filters.createdAt.$lte = new Date(createdTo as string);
-                }
-            }
-
-            // Sort options
-            const sortOptions: any = {};
-            sortOptions[sortBy as string] = sortOrder === 'desc' ? -1 : 1;
-
-            // Pagination
             const pageNum = parseInt(page as string);
             const limitNum = parseInt(limit as string);
             const skip = (pageNum - 1) * limitNum;
 
-            // Gọi method search trong UserModel
+            // Tạo search query với regex case-insensitive
+            const searchQuery = q ? {
+                $or: [
+                    { username: { $regex: q as string, $options: 'i' } },
+                    { email: { $regex: q as string, $options: 'i' } }
+                ]
+            } : {};
+
+            // Tạo sort object
+            const sortObj: any = {};
+            sortObj[sortBy as string] = sortOrder === 'desc' ? -1 : 1;
+
+            // Sử dụng userModel thay vì User
             const result = await userModel.searchUsers(
-                filters,
-                sortOptions,
+                searchQuery,
+                sortObj,
                 skip,
                 limitNum
             );
 
-            res.json({
-                message: 'Users fetched successfully',
+            res.status(200).json({
+                success: true,
+                message: `Search results for "${q}"`,
                 data: result.users,
                 pagination: {
                     currentPage: pageNum,
@@ -118,107 +90,141 @@ export class UserController {
                     hasNextPage: pageNum < Math.ceil(result.total / limitNum),
                     hasPrevPage: pageNum > 1
                 },
-                filters: filters // Return applied filters for reference
+                searchTerm: q
             });
 
         } catch (error) {
-            console.error('Error searching users:', error);
-            res.status(500).json({ message: 'Error searching users' });
+            console.error('Search users error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Error searching users',
+                error: error instanceof Error ? error.message : 'Unknown error'
+            });
         }
     }
 
-    // Advanced search với multiple conditions
-    async advancedSearch(req: Request, res: Response) {
+    // Advanced search with multiple criteria
+    async advancedSearchUsers(req: Request, res: Response) {
         try {
             const {
-                query,           // JSON string của complex query
-                fields,          // Fields cần return
-                page = '1',
-                limit = '10'
-            } = req.query;
-
-            let searchQuery = {};
-            let selectFields = '';
-
-            // Parse query nếu có
-            if (query) {
-                try {
-                    searchQuery = JSON.parse(query as string);
-                } catch (error) {
-                    return res.status(400).json({ 
-                        message: 'Invalid query format. Must be valid JSON.' 
-                    });
-                }
-            }
-
-            // Parse fields to select
-            if (fields) {
-                selectFields = (fields as string);
-            }
+                username,
+                email,
+                role,
+                isActive,
+                dateRange,
+                page = 1,
+                limit = 10,
+                sortBy = 'createdAt',
+                sortOrder = 'desc'
+            } = req.body;
 
             const pageNum = parseInt(page as string);
             const limitNum = parseInt(limit as string);
             const skip = (pageNum - 1) * limitNum;
 
-            const result = await userModel.advancedSearch(
-                searchQuery,
-                selectFields,
-                '', // populateFields not used with current schema
+            // Xây dựng query object
+            const query: any = {};
+
+            if (username) {
+                query.username = { $regex: username, $options: 'i' };
+            }
+
+            if (email) {
+                query.email = { $regex: email, $options: 'i' };
+            }
+
+            if (role) {
+                query.role = role;
+            }
+
+            if (isActive !== undefined) {
+                query.isActive = isActive;
+            }
+
+            if (dateRange && dateRange.start && dateRange.end) {
+                query.createdAt = {
+                    $gte: new Date(dateRange.start),
+                    $lte: new Date(dateRange.end)
+                };
+            }
+
+            // Tạo sort object
+            const sortObj: any = {};
+            sortObj[sortBy] = sortOrder === 'desc' ? -1 : 1;
+
+            // Sử dụng userModel thay vì User
+            const result = await userModel.searchUsers(
+                query,
+                sortObj,
                 skip,
                 limitNum
             );
 
-            res.json({
+            res.status(200).json({
+                success: true,
                 message: 'Advanced search completed',
                 data: result.users,
                 pagination: {
                     currentPage: pageNum,
                     totalPages: Math.ceil(result.total / limitNum),
                     totalUsers: result.total,
-                    usersPerPage: limitNum
+                    usersPerPage: limitNum,
+                    hasNextPage: pageNum < Math.ceil(result.total / limitNum),
+                    hasPrevPage: pageNum > 1
                 },
-                query: searchQuery
+                searchCriteria: req.body
             });
 
         } catch (error) {
-            console.error('Error in advanced search:', error);
-            res.status(500).json({ message: 'Error in advanced search' });
+            console.error('Advanced search error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Error in advanced search',
+                error: error instanceof Error ? error.message : 'Unknown error'
+            });
         }
     }
 
-    // Suggestions cho autocomplete
+    // Get user suggestions for autocomplete
     async getUserSuggestions(req: Request, res: Response) {
         try {
-            const { field, query, limit = '5' } = req.query;
+            const { field, q, limit = 5 } = req.query;
 
-            if (!field || !query) {
-                return res.status(400).json({ 
-                    message: 'Field and query parameters are required' 
-                });
-            }
-
-            // Validate field
-            const allowedFields = ['username', 'email'];
-            if (!allowedFields.includes(field as string)) {
+            if (!field || !q) {
                 return res.status(400).json({
-                    message: `Field must be one of: ${allowedFields.join(', ')}`
+                    success: false,
+                    message: 'Field and query parameters are required'
                 });
             }
 
-            const suggestions = await userModel.getSuggestions(
-                field as string,
-                query as string,
+            const searchQuery: any = {};
+            searchQuery[field as string] = { $regex: q as string, $options: 'i' };
+
+            // Sử dụng userModel.searchUsers và lấy suggestions từ kết quả
+            const result = await userModel.searchUsers(
+                searchQuery,
+                {},
+                0,
                 parseInt(limit as string)
             );
 
-            res.json({
-                message: 'Suggestions fetched successfully',
-                data: suggestions
+            const suggestions = result.users
+                .map(user => user[field as keyof typeof user])
+                .filter(Boolean);
+            const uniqueSuggestions = [...new Set(suggestions)];
+
+            res.status(200).json({
+                success: true,
+                suggestions: uniqueSuggestions
             });
 
         } catch (error) {
-            console.error('Error getting suggestions:', error);
-            res.status(500).json({ message: 'Error getting suggestions' });
+            console.error('Get suggestions error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Error getting suggestions',
+                error: error instanceof Error ? error.message : 'Unknown error'
+            });
         }
     }
 
@@ -346,6 +352,150 @@ export class UserController {
             }
         } catch (error) {
             res.status(500).json({ message: 'Error deleting user' });
+        }
+    }
+
+    // Admin only: Toggle user status (activate/deactivate)
+    async toggleUserStatus(req: Request, res: Response) {
+        try {
+            const { id } = req.params;
+            const { isActive } = req.body;
+            const currentUserId = req.user?.userId;
+
+            // Không cho phép admin tự deactivate chính mình
+            if (currentUserId === id && !isActive) {
+                return res.status(400).json({
+                    message: 'Cannot deactivate your own account'
+                });
+            }
+
+            const success = await userModel.update(id, { isActive });
+            if (!success) {
+                return res.status(404).json({
+                    message: 'User not found'
+                });
+            }
+
+            const user = await userModel.findById(id);
+            res.json({
+                message: `User ${isActive ? 'activated' : 'deactivated'} successfully`,
+                user
+            });
+
+        } catch (error) {
+            console.error('Toggle user status error:', error);
+            res.status(500).json({ message: 'Error updating user status' });
+        }
+    }
+
+    // Admin only: Update all user information
+    async updateUserByAdmin(req: Request, res: Response) {
+        try {
+            const { id } = req.params;
+            const currentUserId = req.user?.userId;
+
+            // Không cho phép admin cập nhật thông tin của chính mình qua API này
+            if (currentUserId === id) {
+                return res.status(400).json({
+                    message: 'Cannot update your own account through this endpoint'
+                });
+            }
+
+            const success = await userModel.update(id, req.body);
+            if (!success) {
+                return res.status(404).json({
+                    message: 'User not found'
+                });
+            }
+
+            const updatedUser = await userModel.findById(id);
+            res.json({
+                message: 'User updated successfully',
+                user: updatedUser
+            });
+
+        } catch (error) {
+            console.error('Update user by admin error:', error);
+            res.status(500).json({ message: 'Error updating user' });
+        }
+    }
+
+    // Admin only: Change user role
+    async changeUserRole(req: Request, res: Response) {
+        try {
+            const { id } = req.params;
+            const { role } = req.body;
+            const currentUserId = req.user?.userId;
+
+            if (!['user', 'admin'].includes(role)) {
+                return res.status(400).json({
+                    message: 'Invalid role. Must be user or admin'
+                });
+            }
+
+            // Không cho phép admin thay đổi role của chính mình
+            if (currentUserId === id) {
+                return res.status(400).json({
+                    message: 'Cannot change your own role'
+                });
+            }
+
+            const success = await userModel.update(id, { role });
+            if (!success) {
+                return res.status(404).json({
+                    message: 'User not found'
+                });
+            }
+
+            const user = await userModel.findById(id);
+            res.json({
+                message: 'User role updated successfully',
+                user
+            });
+
+        } catch (error) {
+            console.error('Change user role error:', error);
+            res.status(500).json({ message: 'Error updating user role' });
+        }
+    }
+
+    // Admin only: Get all users with role and status filters
+    async getAdminUsers(req: Request, res: Response) {
+        try {
+            const page = parseInt(req.query.page as string) || 1;
+            const limit = parseInt(req.query.limit as string) || 10;
+            const { role, isActive } = req.query;
+
+            // Build filters
+            const filters: any = {};
+            if (role) filters.role = role;
+            if (isActive !== undefined) filters.isActive = isActive === 'true';
+
+            const skip = (page - 1) * limit;
+            const result = await userModel.searchUsers(
+                filters,
+                { createdAt: -1 },
+                skip,
+                limit
+            );
+
+            res.json({
+                message: 'Users fetched successfully',
+                data: result.users,
+                pagination: {
+                    currentPage: page,
+                    totalPages: Math.ceil(result.total / limit),
+                    totalUsers: result.total,
+                    usersPerPage: limit,
+                    hasNextPage: page < Math.ceil(result.total / limit),
+                    hasPrevPage: page > 1
+                },
+                filters
+            });
+
+        } catch (error) {
+            console.error('Error in getAdminUsers:', error);
+            res.status(500).json({ message: 'Error fetching users' });
         }
     }
 }

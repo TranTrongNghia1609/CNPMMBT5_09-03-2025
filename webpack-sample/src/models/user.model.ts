@@ -12,6 +12,8 @@ export class UserModel {
             username: doc.username,
             email: doc.email,
             password: doc.password,
+            role: doc.role,
+            isActive: doc.isActive,
             refreshToken: doc.refreshToken,
             createdAt: doc.createdAt,
             updatedAt: doc.updatedAt
@@ -42,7 +44,8 @@ export class UserModel {
             const tokenPayload = {
                 userId: user._id.toString(),
                 email: user.email,
-                username: user.username
+                username: user.username,
+                role: user.role
             };
 
             // Generate tokens
@@ -57,6 +60,8 @@ export class UserModel {
                 _id: user._id.toString(),
                 username: user.username,
                 email: user.email,
+                role: user.role,
+                isActive: user.isActive,
                 createdAt: user.createdAt,
                 updatedAt: user.updatedAt
             };
@@ -90,7 +95,8 @@ export class UserModel {
             const tokenPayload = {
                 userId: user._id.toString(),
                 email: user.email,
-                username: user.username
+                username: user.username,
+                role: user.role
             };
 
             const accessToken = jwtService.generateAccessToken(tokenPayload);

@@ -42,15 +42,26 @@ const Header = () => {
                         {isAuthenticated ? (
                             <div className="flex items-center space-x-3 lg:space-x-6">
                                 <div className="flex items-center space-x-2 lg:space-x-3 bg-green-50 px-3 lg:px-4 py-2 rounded-lg">
-                                    <div className="w-8 h-8 lg:w-10 lg:h-10 bg-gradient-to-r from-green-400 to-green-600 rounded-full flex items-center justify-center shadow-md">
+                                    <div className={`w-8 h-8 lg:w-10 lg:h-10 rounded-full flex items-center justify-center shadow-md ${
+                                        user?.role === 'admin' 
+                                            ? 'bg-gradient-to-r from-purple-500 to-purple-700' 
+                                            : 'bg-gradient-to-r from-green-400 to-green-600'
+                                    }`}>
                                         <span className="text-white font-bold text-xs lg:text-sm">
-                                            {user?.username?.charAt(0).toUpperCase()}
+                                            {user?.role === 'admin' ? '👑' : user?.username?.charAt(0).toUpperCase()}
                                         </span>
                                     </div>
                                     <div className="hidden sm:flex flex-col">
-                                        <span className="text-xs lg:text-sm font-semibold text-gray-800">
-                                            {user?.username}
-                                        </span>
+                                        <div className="flex items-center space-x-2">
+                                            <span className="text-xs lg:text-sm font-semibold text-gray-800">
+                                                {user?.username}
+                                            </span>
+                                            {user?.role === 'admin' && (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                                    Admin
+                                                </span>
+                                            )}
+                                        </div>
                                         <span className="text-xs text-gray-500">
                                             {user?.email}
                                         </span>
