@@ -9,7 +9,8 @@ const UserSearch = ({
     showSuggestions,
     suggestionField,
     onSuggestionSelect,
-    onSuggestions
+    onSuggestions,
+    onSearch
 }) => {
     return (
         <div className="border-t pt-6">

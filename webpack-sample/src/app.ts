@@ -37,11 +37,6 @@ const startServer = async () => {
         app.listen(port, () => {
             console.log(`🚀 Server running at http://localhost:${port}`);
             console.log(`📋 API Documentation: http://localhost:${port}/v1/api`);
-            console.log('');
-            console.log('🔐 Admin Credentials:');
-            console.log('   Email: admin@example.com');
-            console.log('   Password: admin123');
-            console.log('');
         });
         
     } catch (error) {

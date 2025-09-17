@@ -10,11 +10,11 @@ const UserTable = ({ users, isAuthenticated, canEditUser, onEdit, onDelete, onTo
         return (
             <div className="p-8 text-center">
                 <div className="flex flex-col items-center">
-                    <svg className="w-16 h-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-16 h-16 text-purple-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2 2v-5m16 0h-6a2 2 0 00-2 2v3a2 2 0 01-2 2H8a2 2 0 01-2-2v-3a2 2 0 00-2-2H4" />
                     </svg>
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No users found</h3>
-                    <p className="text-gray-500">Try adjusting your search or filter criteria</p>
+                    <h3 className="text-lg font-medium text-purple-900 mb-2">No users found</h3>
+                    <p className="text-purple-600">Try adjusting your search or filter criteria</p>
                 </div>
             </div>
         );
@@ -25,8 +25,8 @@ const UserTable = ({ users, isAuthenticated, canEditUser, onEdit, onDelete, onTo
         return (
             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                 isAdminRole 
-                    ? 'bg-purple-100 text-purple-800' 
-                    : 'bg-gray-100 text-gray-800'
+                    ? 'bg-purple-200 text-purple-900' 
+                    : 'bg-lavender-100 text-purple-800'
             }`}>
                 {isAdminRole ? '👑 Admin' : '👤 User'}
             </span>
@@ -35,10 +35,10 @@ const UserTable = ({ users, isAuthenticated, canEditUser, onEdit, onDelete, onTo
 
     const getStatusBadge = (isActive) => {
         return (
-            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                 isActive 
-                    ? 'bg-green-100 text-green-800' 
-                    : 'bg-red-100 text-red-800'
+                    ? 'bg-green-200 text-green-900' 
+                    : 'bg-red-200 text-red-900'
             }`}>
                 {isActive ? '✅ Active' : '❌ Inactive'}
             </span>
@@ -46,58 +46,60 @@ const UserTable = ({ users, isAuthenticated, canEditUser, onEdit, onDelete, onTo
     };
 
     return (
-        <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+        <div className="overflow-x-auto bg-gradient-to-br from-purple-50 to-lavender-50 rounded-lg">
+            <table className="min-w-full divide-y divide-purple-200">
+                <thead className="bg-gradient-to-r from-purple-100 to-lavender-100">
                     <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider">
                             User
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider">
                             Email
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider">
                             Role
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider">
                             Status
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider">
                             Created
                         </th>
                         {isAuthenticated && (
-                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-3 text-right text-xs font-medium text-purple-700 uppercase tracking-wider">
                                 Actions
                             </th>
                         )}
                     </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                    {users.map((user) => (
-                        <tr key={user._id} className={`hover:bg-gray-50 transition-colors ${
-                            user.isActive === false ? 'opacity-60' : ''
-                        }`}>
+                <tbody className="bg-white divide-y divide-purple-100">
+                    {users.map((user, index) => (
+                        <tr key={user._id} className={`transition-colors ${
+                            index % 2 === 0 
+                                ? 'bg-white hover:bg-purple-50' 
+                                : 'bg-purple-25 hover:bg-purple-75'
+                        } ${user.isActive === false ? 'opacity-60' : ''}`}>
                             <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="flex items-center">
                                     <div className="flex-shrink-0 h-10 w-10">
-                                        <div className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center">
+                                        <div className="h-10 w-10 rounded-full bg-gradient-to-r from-purple-400 to-lavender-500 flex items-center justify-center shadow-md">
                                             <span className="text-sm font-medium text-white">
                                                 {user.username ? user.username.charAt(0).toUpperCase() : 'U'}
                                             </span>
                                         </div>
                                     </div>
                                     <div className="ml-4">
-                                        <div className="text-sm font-medium text-gray-900">
+                                        <div className="text-sm font-medium text-purple-900">
                                             {user.username || 'Unknown'}
                                         </div>
-                                        <div className="text-sm text-gray-500">
+                                        <div className="text-sm text-purple-600">
                                             ID: {user._id}
                                         </div>
                                     </div>
                                 </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-900">{user.email || 'No email'}</div>
+                                <div className="text-sm text-purple-800">{user.email || 'No email'}</div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                                 {getRoleBadge(user.role)}
@@ -106,7 +108,7 @@ const UserTable = ({ users, isAuthenticated, canEditUser, onEdit, onDelete, onTo
                                 {getStatusBadge(user.isActive !== false)}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-900">
+                                <div className="text-sm text-purple-800">
                                     {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Unknown'}
                                 </div>
                             </td>
@@ -122,11 +124,11 @@ const UserTable = ({ users, isAuthenticated, canEditUser, onEdit, onDelete, onTo
                                                             onToggleStatus && onToggleStatus(user._id, !user.isActive);
                                                         }
                                                     }}
-                                                    className={`inline-flex items-center px-2 py-1 border border-transparent text-xs leading-4 font-medium rounded ${
+                                                    className={`inline-flex items-center px-2 py-1 border border-transparent text-xs leading-4 font-medium rounded-md shadow-sm ${
                                                         user.isActive 
-                                                            ? 'text-red-700 bg-red-100 hover:bg-red-200' 
-                                                            : 'text-green-700 bg-green-100 hover:bg-green-200'
-                                                    } transition-colors ${!isAdmin ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                            ? 'text-red-700 bg-red-100 hover:bg-red-200 border-red-200' 
+                                                            : 'text-green-700 bg-green-100 hover:bg-green-200 border-green-200'
+                                                    } transition-all duration-200 ${!isAdmin ? 'opacity-50 cursor-not-allowed' : ''}`}
                                                     title={!isAdmin ? 'Admin permission required' : (user.isActive ? 'Deactivate User' : 'Activate User')}
                                                     disabled={!isAdmin}
                                                 >
@@ -136,7 +138,7 @@ const UserTable = ({ users, isAuthenticated, canEditUser, onEdit, onDelete, onTo
                                                 <select
                                                     value={user.role || 'user'}
                                                     onChange={(e) => onChangeRole && onChangeRole(user._id, e.target.value)}
-                                                    className="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    className="text-xs border border-purple-300 rounded-md px-2 py-1 bg-white text-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-purple-400 shadow-sm"
                                                     title="Change Role"
                                                 >
                                                     <option value="user">👤 User</option>
@@ -149,7 +151,7 @@ const UserTable = ({ users, isAuthenticated, canEditUser, onEdit, onDelete, onTo
                                         {canEditUser(user) && (
                                             <button
                                                 onClick={() => onEdit(user)}
-                                                className="inline-flex items-center px-2 py-1 border border-transparent text-xs leading-4 font-medium rounded text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                                                className="inline-flex items-center px-3 py-1 border border-transparent text-xs leading-4 font-medium rounded-md text-purple-700 bg-purple-100 hover:bg-purple-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-all duration-200 shadow-sm"
                                                 title="Edit User"
                                             >
                                                 <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -163,7 +165,7 @@ const UserTable = ({ users, isAuthenticated, canEditUser, onEdit, onDelete, onTo
                                         {isAdmin && user._id !== currentUser._id && (
                                             <button
                                                 onClick={() => onDelete(user._id)}
-                                                className="inline-flex items-center px-2 py-1 border border-transparent text-xs leading-4 font-medium rounded text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+                                                className="inline-flex items-center px-3 py-1 border border-transparent text-xs leading-4 font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all duration-200 shadow-sm"
                                                 title="Delete User"
                                             >
                                                 <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">

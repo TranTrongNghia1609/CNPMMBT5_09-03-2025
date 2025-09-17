@@ -9,9 +9,11 @@ import {
     getUserSuggestionsAPI, 
     filterUsersAPI,
     toggleUserStatusAPI,
-    changeUserRoleAPI
+    changeUserRoleAPI,
+    advancedSearchUsersAPI
 } from '../components/util/api';
 import { useAuth } from '../components/context/auth.context';
+import FuzzySearch from 'fuzzy-search';
 
 // Import components
 import UserFilters from '../components/user/UserFilters';
@@ -22,6 +24,7 @@ import Pagination from '../components/user/Pagination';
 
 const UserPage = () => {
     const [users, setUsers] = useState([]);
+    const [allUsers, setAllUsers] = useState([]); // Store original users for fuzzy search
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [pagination, setPagination] = useState({
@@ -39,22 +42,11 @@ const UserPage = () => {
     });
 
     // Search & Filter States
-    const [searchParams, setSearchParams] = useState({
-        search: '',
-        username: '',
-        email: '',
-        createdFrom: '',
-        createdTo: '',
-        sortBy: 'createdAt',
-        sortOrder: 'desc'
-    });
-    const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
     const [activeFilter, setActiveFilter] = useState(null);
-    const [suggestions, setSuggestions] = useState([]);
-    const [showSuggestions, setShowSuggestions] = useState(false);
-    const [suggestionField, setSuggestionField] = useState('');
-
+    const [useFuzzySearch, setUseFuzzySearch] = useState(false);
+    const [fuzzyResults, setFuzzyResults] = useState([]);
     const { user: currentUser, isAuthenticated } = useAuth();
+    const [query, setQuery] = useState("");
 
     const normalizeUser = (u) => ({
         _id: u._id || u.id || u.userId || '',
@@ -64,61 +56,39 @@ const UserPage = () => {
         isActive: u.isActive !== false,
         createdAt: u.createdAt || u.created_at || u.dateCreated || new Date().toISOString()
     });
-    // Fetch users function
+
+    // ✅ Hàm fetch users cơ bản
     const fetchUsers = async () => {
         setLoading(true);
         try {
-            let response;
+            const response = await getAllUsersAPI({
+                page: pagination.page,
+                limit: pagination.limit
+            });
 
-            if (activeFilter) {
-                // Sử dụng preset filter
-                response = await filterUsersAPI(activeFilter, {
-                    page: pagination.page,
-                    limit: pagination.limit
-                });
-            } else if (searchParams.search) {
-                // Global search - sử dụng search API đơn giản
-                response = await searchUsersAPI({
-                    query: searchParams.search,
-                    page: pagination.page,
-                    limit: pagination.limit
-                });
-            } else if (searchParams.username || searchParams.email || searchParams.createdFrom || searchParams.createdTo) {
-                // Advanced search - sử dụng advanced search API
-                response = await advancedSearchUsersAPI({
-                    ...searchParams,
-                    page: pagination.page,
-                    limit: pagination.limit
-                });
-            } else {
-                // Lấy tất cả users
-                response = await getAllUsersAPI({
-                    page: pagination.page,
-                    limit: pagination.limit
-                });
-            }
-
-            // Xử lý nhiều format response khác nhau
             let userData = [];
             if (response.data.users) {
                 userData = response.data.users;
-            } else if (response.data.data) {
-                userData = response.data.data;
-            } else if (Array.isArray(response.data)) {
-                userData = response.data;
+                setPagination(prev => ({
+                    ...prev,
+                    total: response.data.total,
+                    totalPages: response.data.totalPages
+                }));
             } else {
-                userData = [];
+                userData = response.data;
+                setPagination(prev => ({
+                    ...prev,
+                    total: userData.length,
+                    totalPages: Math.ceil(userData.length / prev.limit)
+                }));
             }
             
-            const normalizedUsers = Array.isArray(userData) ? userData.map(normalizeUser) : [];
-            
+            // Normalize users
+            const normalizedUsers = userData.map(normalizeUser);
             setUsers(normalizedUsers);
-            setPagination(prev => ({
-                ...prev,
-                total: response.data.total || normalizedUsers.length,
-                totalPages: response.data.totalPages || Math.ceil((response.data.total || normalizedUsers.length) / prev.limit)
-            }));
-         } catch (error) {
+            setAllUsers(normalizedUsers);
+            
+        } catch (error) {
             setError('Failed to fetch users');
             console.error('Fetch users error:', error);
         } finally {
@@ -126,30 +96,187 @@ const UserPage = () => {
         }
     };
 
-    // useEffect hooks
-    useEffect(() => {
-        if (isAuthenticated) {
-            fetchUsers();
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [pagination.page, pagination.limit, activeFilter, isAuthenticated]);
+    // ✅ Hàm filter riêng biệt
+    const fetchFilteredUsers = async (filterType) => {
+        setLoading(true);
+        try {
+            console.log('Fetching filtered users with filterType:', filterType);
+            
+            const response = await filterUsersAPI(filterType, {
+                page: pagination.page,
+                limit: pagination.limit
+            });
 
-    // Debounce search để tránh gọi API quá nhiều
-    useEffect(() => {
-        const timeoutId = setTimeout(() => {
-            if (searchParams.search || searchParams.username || searchParams.email) {
+            console.log('Filter API Response:', response);
+
+            let userData = [];
+            let totalCount = 0;
+            let totalPages = 1;
+
+            // Xử lý response structure từ filter API
+            if (response.data.data) {
+                userData = response.data.data;
+                totalCount = response.data.pagination?.totalUsers || userData.length;
+                totalPages = response.data.pagination?.totalPages || 1;
+            } else if (response.data.users) {
+                userData = response.data.users;
+                totalCount = response.data.total || userData.length;
+                totalPages = response.data.totalPages || 1;
+            } else if (Array.isArray(response.data)) {
+                userData = response.data;
+                totalCount = userData.length;
+                totalPages = 1;
+            }
+
+            const normalizedUsers = userData.map(normalizeUser);
+            setUsers(normalizedUsers);
+            setAllUsers(normalizedUsers); // Store for fuzzy search
+            
+            setPagination(prev => ({
+                ...prev,
+                total: totalCount,
+                totalPages: totalPages
+            }));
+
+        } catch (error) {
+            setError('Failed to fetch filtered users');
+            console.error('Filter users error:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // ✅ Fuzzy Search Handler
+    const handleFuzzySearch = (searchQuery) => {
+        if (!searchQuery.trim()) {
+            // Reset về tất cả users khi search empty
+            if (activeFilter) {
+                fetchFilteredUsers(activeFilter);
+            } else {
                 fetchUsers();
             }
-        }, 500);
+            setFuzzyResults([]);
+            return;
+        }
 
-        return () => clearTimeout(timeoutId);
-    }, [searchParams.search, searchParams.username, searchParams.email]);
+        const searcher = new FuzzySearch(allUsers, ["username", "email"], { 
+            caseSensitive: false,
+            sort: true
+        });
+        const results = searcher.search(searchQuery);
+        
+        setFuzzyResults(results);
+        
+        // Apply pagination to fuzzy results
+        const startIndex = (pagination.page - 1) * pagination.limit;
+        const endIndex = startIndex + pagination.limit;
+        const paginatedResults = results.slice(startIndex, endIndex);
+        
+        setUsers(paginatedResults);
+        setPagination(prev => ({
+            ...prev,
+            total: results.length,
+            totalPages: Math.ceil(results.length / prev.limit)
+        }));
+    };
+
+    // ✅ Search handler
+    const handleSearchChange = (value) => {
+        setQuery(value);
+        
+        if (useFuzzySearch) {
+            handleFuzzySearch(value);
+        } else {
+            if (!value.trim()) {
+                // Reset về data gốc
+                if (activeFilter) {
+                    fetchFilteredUsers(activeFilter);
+                } else {
+                    fetchUsers();
+                }
+            }
+        }
+        
+        // Reset to page 1 when searching
+        setPagination(prev => ({ ...prev, page: 1 }));
+    };
+
+    // ✅ Toggle Fuzzy Search
+    const toggleFuzzySearch = () => {
+        setUseFuzzySearch(prev => {
+            const newValue = !prev;
+            
+            if (newValue && query) {
+                // If enabling fuzzy search and there's a query, apply fuzzy search
+                handleFuzzySearch(query);
+            } else if (!newValue) {
+                // If disabling fuzzy search, reset to original data
+                if (activeFilter) {
+                    fetchFilteredUsers(activeFilter);
+                } else {
+                    fetchUsers();
+                }
+                setFuzzyResults([]);
+            }
+            
+            return newValue;
+        });
+    };
+
+    // ✅ Filter handlers
+    const handleFilterClick = (filterType) => {
+        setActiveFilter(filterType);
+        setQuery(''); // Clear fuzzy search
+        setFuzzyResults([]);
+        setPagination(prev => ({ ...prev, page: 1 }));
+        
+        // Fetch filtered data
+        fetchFilteredUsers(filterType);
+    };
+
+    const clearFilters = () => {
+        setActiveFilter(null);
+        setQuery(''); // Clear fuzzy search
+        setFuzzyResults([]);
+        setPagination(prev => ({ ...prev, page: 1 }));
+        
+        // Fetch all users
+        fetchUsers();
+    };
+
+    // ✅ useEffect hooks
+    useEffect(() => {
+        if (isAuthenticated) {
+            if (activeFilter) {
+                fetchFilteredUsers(activeFilter);
+            } else {
+                fetchUsers();
+            }
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isAuthenticated]);
+
+    // Handle pagination
+    useEffect(() => {
+        if (useFuzzySearch && fuzzyResults.length > 0) {
+            // Handle fuzzy search pagination
+            const startIndex = (pagination.page - 1) * pagination.limit;
+            const endIndex = startIndex + pagination.limit;
+            const paginatedResults = fuzzyResults.slice(startIndex, endIndex);
+            setUsers(paginatedResults);
+        } else{
+            // Handle regular pagination
+            if (activeFilter) {
+                fetchFilteredUsers(activeFilter);
+            } else {
+                fetchUsers();
+            }
+        }
+    }, [pagination.page, pagination.limit]);
 
     // Helper functions
     const hasSearchParams = () => {
-        return Object.values(searchParams).some(value =>
-            value && value !== 'createdAt' && value !== 'desc'
-        );
+        return query.trim() || activeFilter;
     };
 
     const canEditUser = (user) => {
@@ -161,108 +288,10 @@ const UserPage = () => {
         return isAuthenticated && currentUser && currentUser._id === user._id;
     };
 
-    // Search handlers
-    const handleSearchChange = (field, value) => {
-        if (field === 'triggerSearch') {
-            // Kích hoạt tìm kiếm thủ công
-            fetchUsers();
-            return;
-        }
-        
-        setSearchParams(prev => ({
-            ...prev,
-            [field]: value
-        }));
-        
-        // Reset pagination when searching
-        setPagination(prev => ({ ...prev, page: 1 }));
-        
-        // Clear active filter when searching
-        if (activeFilter) {
-            setActiveFilter(null);
-        }
-    };
-
-    const handleSuggestions = async (field, query) => {
-        if (query.length < 2) {
-            setSuggestions([]);
-            setShowSuggestions(false);
-            return;
-        }
-
-        try {
-            const response = await getUserSuggestionsAPI(field, query, 5);
-            console.log("Raw suggestion response:", response.data);
-            
-            // Kiểm tra nhiều cấu trúc dữ liệu có thể
-            let suggestionsData = [];
-            if (response.data) {
-                if (Array.isArray(response.data)) {
-                    suggestionsData = response.data;
-                } else if (response.data.data && Array.isArray(response.data.data)) {
-                    suggestionsData = response.data.data;
-                } else if (response.data.suggestions && Array.isArray(response.data.suggestions)) {
-                    suggestionsData = response.data.suggestions;
-                }
-            }
-            
-            console.log("Processed suggestions:", suggestionsData);
-            setSuggestions(suggestionsData);
-            setSuggestionField(field);
-            setShowSuggestions(suggestionsData.length > 0);
-        } catch (error) {
-            console.error('Error fetching suggestions:', error);
-            setSuggestions([]);
-            setShowSuggestions(false);
-        }
-    };
-
-    const handleSuggestionSelect = (field, suggestion) => {
-        setSearchParams(prev => ({
-            ...prev,
-            [field]: suggestion
-        }));
-        setShowSuggestions(false);
-        setSuggestions([]);
-        setSuggestionField('');
-        // Gọi fetchUsers để cập nhật kết quả
-        fetchUsers();
-    };
-
-    // Filter handlers
-    const handleFilterClick = (filterType) => {
-        setActiveFilter(filterType);
-        setSearchParams({
-            search: '',
-            username: '',
-            email: '',
-            createdFrom: '',
-            createdTo: '',
-            sortBy: 'createdAt',
-            sortOrder: 'desc'
-        });
-        setPagination(prev => ({ ...prev, page: 1 }));
-    };
-
-    const clearFilters = () => {
-        setActiveFilter(null);
-        setSearchParams({
-            search: '',
-            username: '',
-            email: '',
-            createdFrom: '',
-            createdTo: '',
-            sortBy: 'createdAt',
-            sortOrder: 'desc'
-        });
-        setPagination(prev => ({ ...prev, page: 1 }));
-    };
-
-    // CRUD handlers
+    // ✅ CRUD handlers - keeping existing code
     const handleCreate = () => {
         setEditingUser(null);
         
-        // Nếu là admin, cho phép tạo với đầy đủ thông tin
         if (currentUser?.role === 'admin') {
             setFormData({
                 username: '',
@@ -273,7 +302,6 @@ const UserPage = () => {
                 phone: ''
             });
         } else {
-            // User thường chỉ có thể tạo với thông tin cơ bản
             setFormData({
                 username: '',
                 email: '',
@@ -287,7 +315,6 @@ const UserPage = () => {
     const handleEdit = (user) => {
         setEditingUser(user);
         
-        // Nếu là admin, cho phép chỉnh sửa tất cả thông tin
         if (currentUser?.role === 'admin') {
             setFormData({
                 username: user.username,
@@ -295,10 +322,9 @@ const UserPage = () => {
                 role: user.role || 'user',
                 isActive: user.isActive !== false,
                 phone: user.phone || '',
-                password: '' // Không hiển thị password cũ
+                password: ''
             });
         } else {
-            // User thường chỉ có thể chỉnh sửa thông tin cơ bản
             setFormData({
                 username: user.username,
                 email: user.email,
@@ -316,7 +342,12 @@ const UserPage = () => {
 
         try {
             await deleteUserAPI(userId);
-            fetchUsers();
+            // Refresh current view
+            if (activeFilter) {
+                fetchFilteredUsers(activeFilter);
+            } else {
+                fetchUsers();
+            }
         } catch (error) {
             setError(error.response?.data?.message || 'Failed to delete user');
         }
@@ -328,10 +359,8 @@ const UserPage = () => {
         try {
             if (editingUser) {
                 if (currentUser?.role === 'admin') {
-                    // Nếu là admin, sử dụng API cập nhật đầy đủ
                     await updateUserByAdminAPI(editingUser._id, formData);
                 } else {
-                    // Nếu là user thường, chỉ cập nhật thông tin cơ bản
                     await updateUserAPI(editingUser._id, {
                         username: formData.username,
                         email: formData.email
@@ -342,7 +371,12 @@ const UserPage = () => {
             }
             
             setShowModal(false);
-            fetchUsers();
+            // Refresh current view
+            if (activeFilter) {
+                fetchFilteredUsers(activeFilter);
+            } else {
+                fetchUsers();
+            }
         } catch (error) {
             console.error('Submit error:', error);
             setError(error.response?.data?.message || 'Operation failed');
@@ -358,7 +392,12 @@ const UserPage = () => {
 
         try {
             await toggleUserStatusAPI(userId, newStatus);
-            fetchUsers();
+            // Refresh current view
+            if (activeFilter) {
+                fetchFilteredUsers(activeFilter);
+            } else {
+                fetchUsers();
+            }
         } catch (error) {
             console.error('Toggle status error:', error);
             setError(error.response?.data?.message || 'Failed to update user status');
@@ -372,7 +411,12 @@ const UserPage = () => {
 
         try {
             await changeUserRoleAPI(userId, newRole);
-            fetchUsers();
+            // Refresh current view
+            if (activeFilter) {
+                fetchFilteredUsers(activeFilter);
+            } else {
+                fetchUsers();
+            }
         } catch (error) {
             setError(error.response?.data?.message || 'Failed to change user role');
         }
@@ -382,10 +426,8 @@ const UserPage = () => {
     const handlePageChange = (newPage) => {
         setPagination(prev => ({ ...prev, page: newPage }));
     };
-    
 
-     return (
-        // Remove bg-gray-50 min-h-screen since it's now in App.jsx
+    return (
         <div className="w-full">
             <div className="w-full px-6 lg:px-12 xl:px-16 py-6">
                 {/* Header */}
@@ -418,17 +460,61 @@ const UserPage = () => {
                         onClearFilters={clearFilters}
                     />
 
-                    <UserSearch
-                        searchParams={searchParams}
-                        onSearchChange={handleSearchChange}
-                        showAdvancedSearch={showAdvancedSearch}
-                        setShowAdvancedSearch={setShowAdvancedSearch}
-                        suggestions={suggestions}
-                        showSuggestions={showSuggestions}
-                        suggestionField={suggestionField}
-                        onSuggestionSelect={handleSuggestionSelect}
-                        onSuggestions={handleSuggestions}
-                    />
+                    {/* Fuzzy Search Toggle */}
+                    <div className="mb-4 flex items-center justify-between border-b border-gray-200 pb-4">
+                        <div className="flex items-center space-x-4">
+                            <label className="flex items-center cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={useFuzzySearch}
+                                    onChange={toggleFuzzySearch}
+                                    className="sr-only"
+                                />
+                                <div className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${
+                                    useFuzzySearch ? 'bg-blue-600' : 'bg-gray-300'
+                                }`}>
+                                    <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform duration-200 ${
+                                        useFuzzySearch ? 'transform translate-x-6' : ''
+                                    }`}></div>
+                                </div>
+                                <span className="ml-3 text-sm font-medium text-gray-700">
+                                    Fuzzy Search
+                                </span>
+                            </label>
+                            {useFuzzySearch && (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                    Smart Search Enabled
+                                </span>
+                            )}
+                        </div>
+                        {useFuzzySearch && fuzzyResults.length > 0 && query && (
+                            <span className="text-sm text-gray-600">
+                                Fuzzy results: {fuzzyResults.length} matches
+                            </span>
+                        )}
+                    </div>
+
+                    {/* Search Input */}
+                    <div className="relative">
+                        <input
+                            type="text"
+                            placeholder={useFuzzySearch ? "Tìm kiếm ..." : "Tìm kiếm..."}
+                            value={query}
+                            onChange={(e) => handleSearchChange(e.target.value)}
+                            className={`w-full text-black border rounded-lg px-4 py-3 mb-3 focus:outline-none focus:ring-2 transition-all duration-200 ${
+                                useFuzzySearch 
+                                    ? 'focus:ring-blue-400 border-blue-300 bg-blue-50' 
+                                    : 'focus:ring-gray-400 border-gray-300'
+                            }`}
+                        />
+                        {useFuzzySearch && (
+                            <div className="absolute right-3 top-3">
+                                <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                </svg>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* Error Message */}
@@ -444,18 +530,33 @@ const UserPage = () => {
                 )}
 
                 {/* Results Summary */}
-                {(activeFilter || hasSearchParams()) && (
-                    <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6 rounded-lg">
+                {hasSearchParams() && (
+                    <div className={`border-l-4 p-4 mb-6 rounded-lg ${
+                        useFuzzySearch && fuzzyResults.length > 0 
+                            ? 'bg-green-50 border-green-400' 
+                            : 'bg-blue-50 border-blue-400'
+                    }`}>
                         <div className="flex items-center">
-                            <svg className="w-5 h-5 text-blue-400 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <svg className={`w-5 h-5 mr-3 flex-shrink-0 ${
+                                useFuzzySearch && fuzzyResults.length > 0 
+                                    ? 'text-green-400' 
+                                    : 'text-blue-400'
+                            }`} fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
                             </svg>
-                            <span className="text-blue-700">
-                                {activeFilter
-                                    ? `Showing ${activeFilter} users`
-                                    : `Search results for "${searchParams.search || searchParams.username || searchParams.email}"`
+                            <span className={
+                                useFuzzySearch && fuzzyResults.length > 0 
+                                    ? 'text-green-700' 
+                                    : 'text-blue-700'
+                            }>
+                                {useFuzzySearch && fuzzyResults.length > 0
+                                    ? `Fuzzy search results for "${query}" - ${fuzzyResults.length} smart matches found`
+                                    : activeFilter
+                                        ? `Showing ${activeFilter} users - ${pagination.total} result(s) found`
+                                        : query
+                                            ? `Search results for "${query}" - ${pagination.total} result(s) found`
+                                            : `${pagination.total} result(s) found`
                                 }
-                                {pagination.total > 0 && ` - ${pagination.total} result(s) found`}
                             </span>
                         </div>
                     </div>

@@ -38,3 +38,16 @@ body {
     @apply bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-4;
   }
 }
+
+.bg-lavender-25 { background-color: #faf9ff; }
+.bg-lavender-50 { background-color: #f3f1ff; }
+.bg-lavender-75 { background-color: #ede9ff; }
+.bg-lavender-100 { background-color: #e0d9ff; }
+.bg-lavender-500 { background-color: #8b5fbf; }
+
+.text-lavender-600 { color: #7c3aed; }
+.text-lavender-700 { color: #6d28d9; }
+.text-lavender-800 { color: #5b21b6; }
+
+.border-lavender-200 { border-color: #c4b5fd; }
+.border-lavender-300 { border-color: #a78bfa; }
